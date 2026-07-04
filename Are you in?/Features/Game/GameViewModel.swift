@@ -44,7 +44,7 @@ final class GameViewModel {
         do {
             let detail = try await api.sessionDetail(id: sessionId)
             guard detail.status == .active || detail.status == .completed else {
-                stage = .failed("Ez a kör már nem elérhető.")
+                stage = .failed(unavailableMessage(for: detail.status))
                 return
             }
             items = detail.items
@@ -57,10 +57,17 @@ final class GameViewModel {
                 startPolling()
             } else {
                 stage = .answering
+                // Also watch for the partner logging out mid-round while I'm still
+                // answering - otherwise I'd only find out on my next submit attempt.
+                startPolling()
             }
         } catch {
             stage = .failed(error.localizedDescription)
         }
+    }
+
+    private func unavailableMessage(for status: SessionStatus) -> String {
+        status == .cancelled ? "A partnered kilépett, ezért a kör megszakadt." : "Ez a kör már nem elérhető."
     }
 
     func answer(_ answer: Bool, role: ResponseRole?) async {
@@ -101,6 +108,10 @@ final class GameViewModel {
                     let detail = try await api.sessionDetail(id: sessionId)
                     if detail.status == .completed {
                         stage = .completed
+                        return
+                    } else if detail.status == .cancelled {
+                        awaitingRoleFor = nil
+                        stage = .failed(unavailableMessage(for: .cancelled))
                         return
                     }
                 } catch {

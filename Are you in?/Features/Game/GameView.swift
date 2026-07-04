@@ -40,6 +40,8 @@ struct GameView: View {
             case .failed(let message):
                 VStack(spacing: Theme.Spacing.md) {
                     ErrorBanner(message: message)
+                    Button("Vissza a főoldalra") { path.removeAll() }
+                        .buttonStyle(.primary)
                     Button("Újra") { Task { await viewModel.load() } }
                         .buttonStyle(.secondary)
                 }

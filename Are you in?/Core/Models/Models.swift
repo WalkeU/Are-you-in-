@@ -65,6 +65,7 @@ enum SessionStatus: String, Codable {
     case active = "ACTIVE"
     case completed = "COMPLETED"
     case declined = "DECLINED"
+    case cancelled = "CANCELLED"
 }
 
 struct SessionSummary: Codable, Identifiable, Equatable {
