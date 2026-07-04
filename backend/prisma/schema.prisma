@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SessionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+enum ResponseRole {
+  GIVE
+  RECEIVE
+  BOTH
+}
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  partnerId String?
+  partner   User?   @relation("Partnership", fields: [partnerId], references: [id])
+  partnerOf User[]  @relation("Partnership")
+
+  refreshTokens     RefreshToken[]
+  initiatedSessions GameSession[]  @relation("InitiatedSessions")
+  partnerSessions   GameSession[]  @relation("PartnerSessions")
+  responses         Response[]
+
+  @@index([partnerId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Kink {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  description     String
+  hasRoleVariant  Boolean  @default(false)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  sessionItems GameSessionItem[]
+  responses    Response[]
+  matches      Match[]
+}
+
+model GameSession {
+  id          String        @id @default(cuid())
+  initiatorId String
+  initiator   User          @relation("InitiatedSessions", fields: [initiatorId], references: [id])
+  partnerId   String
+  partner     User          @relation("PartnerSessions", fields: [partnerId], references: [id])
+  itemCount   Int
+  status      SessionStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  acceptedAt  DateTime?
+  completedAt DateTime?
+
+  items     GameSessionItem[]
+  responses Response[]
+  matches   Match[]
+
+  @@index([initiatorId])
+  @@index([partnerId])
+  @@index([status])
+}
+
+model GameSessionItem {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  kinkId    String
+  kink      Kink        @relation(fields: [kinkId], references: [id])
+
+  @@unique([sessionId, kinkId])
+  @@index([sessionId])
+}
+
+model Response {
+  id        String        @id @default(cuid())
+  sessionId String
+  session   GameSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  kinkId    String
+  kink      Kink          @relation(fields: [kinkId], references: [id])
+  answer    Boolean
+  role      ResponseRole?
+  createdAt DateTime      @default(now())
+
+  @@unique([sessionId, userId, kinkId])
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model Match {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  kinkId    String
+  kink      Kink        @relation(fields: [kinkId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@unique([sessionId, kinkId])
+  @@index([sessionId])
+}
