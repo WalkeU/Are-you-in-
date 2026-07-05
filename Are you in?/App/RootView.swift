@@ -2,26 +2,33 @@ import SwiftUI
 
 struct RootView: View {
     @State private var appState = AppState()
+    @AppStorage("hasAcceptedAdultContentWarning") private var hasAcceptedWarning = false
 
     var body: some View {
         Group {
-            switch appState.phase {
-            case .bootstrapping:
-                FullScreenLoading()
-            case .loggedOut:
-                NameEntryView()
-            case .awaitingPartner(let user):
-                PairingView(user: user)
-            case .ready(let user, let partner):
-                MainContainerView(user: user, partner: partner)
+            if !hasAcceptedWarning {
+                AdultContentGateView()
+            } else {
+                Group {
+                    switch appState.phase {
+                    case .bootstrapping:
+                        FullScreenLoading()
+                    case .loggedOut:
+                        NameEntryView()
+                    case .awaitingPartner(let user):
+                        PairingView(user: user)
+                    case .ready(let user, let partner):
+                        MainContainerView(user: user, partner: partner)
+                    }
+                }
+                .environment(appState)
+                .task {
+                    await appState.bootstrap()
+                    #if DEBUG
+                    await UITestHarness.runOnboarding(appState: appState)
+                    #endif
+                }
             }
-        }
-        .environment(appState)
-        .task {
-            await appState.bootstrap()
-            #if DEBUG
-            await UITestHarness.runOnboarding(appState: appState)
-            #endif
         }
     }
 }

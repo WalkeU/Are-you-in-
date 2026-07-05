@@ -5,7 +5,7 @@ struct NewSessionSheet: View {
     /// Returns whether the round was actually created - lets the sheet show its own
     /// full loading state and only close once we know which way it went, instead of
     /// dismissing on a timer and hoping the home screen underneath has caught up.
-    var onStart: (Int, KinkIntensity, Bool) async -> Bool
+    var onStart: @MainActor (Int, KinkIntensity, Bool) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var itemCount: Double = 10
@@ -109,19 +109,13 @@ struct NewSessionSheet: View {
 
     private func startTapped() {
         isCreating = true
-        Task {
-            // Force the loading screen to stay up for a flat 3s no matter how fast the
-            // network actually is - runs concurrently with the real request, so this
-            // only adds wait time on top of whatever the request itself needs, never
-            // less than 3s of loading before we ever reveal what's underneath.
-            async let outcome = onStart(Int(itemCount), selectedIntensity, exactIntensity)
-            try? await Task.sleep(for: .seconds(3))
-            _ = await outcome
-            // One more short settle beat after the real work is done, so the home
-            // screen underneath has definitely rendered the "waiting" state at least
-            // once before the dismiss animation starts uncovering it.
-            try? await Task.sleep(for: .milliseconds(400))
-            dismiss()
+        Task { @MainActor in
+            let didStart = await onStart(Int(itemCount), selectedIntensity, exactIntensity)
+            if didStart {
+                dismiss()
+            } else {
+                isCreating = false
+            }
         }
     }
 

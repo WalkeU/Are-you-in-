@@ -1,0 +1,16 @@
+# Example reverse proxy for production, terminating TLS for rui.walkegabor.hu and
+# forwarding to the `api` container (see docker-compose.yml, published on :3000).
+#
+# The iOS release build talks to https://rui.walkegabor.hu/api (see
+# `Are you in?/Core/Config.swift`), so something on the server must own port 443,
+# hold a valid certificate for that hostname, and proxy to the API container -
+# App Transport Security on iOS refuses plain HTTP for release builds.
+#
+# Usage (Caddy auto-provisions and renews the Let's Encrypt certificate; DNS for
+# rui.walkegabor.hu must already point at this server):
+#   caddy run --config Caddyfile.example
+# or run Caddy as its own container on the same Docker network as `api`.
+
+rui.walkegabor.hu {
+	reverse_proxy localhost:3000
+}

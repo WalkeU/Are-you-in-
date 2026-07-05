@@ -46,6 +46,16 @@ The `api` container runs `prisma migrate deploy` and seeds the catalog automatic
 startup before booting the server, so a fresh deploy is self-sufficient given only a `.env`
 file. `GET /health` is wired up for the container `HEALTHCHECK` and for load balancer probes.
 
+The production API is expected to be reachable at `https://rui.walkegabor.hu/api` (this is
+hardcoded as the release-build base URL in the iOS app's `Core/Config.swift`). The
+`docker-compose.yml` `api` service only publishes plain HTTP on `:3000` - a TLS-terminating
+reverse proxy in front of it (owning port 443 for `rui.walkegabor.hu`) is required, since iOS
+App Transport Security refuses plain HTTP for release builds. See `Caddyfile.example` for a
+minimal Caddy config that auto-provisions the certificate; any reverse proxy works as long as
+it forwards to the `api` container on port 3000. Once that's in place, set
+`CORS_ORIGINS=https://rui.walkegabor.hu` in `.env` (only relevant for a future browser-based
+client - the native app doesn't send an `Origin` header).
+
 ## Known local-path caveat
 
 The parent folder name (`Are you in?`) contains a literal `?`. `tsx` and `vitest` (both

@@ -12,7 +12,7 @@ enum AppConfig {
         #if DEBUG
         return URL(string: "http://192.168.0.150:3000/api")!
         #else
-        return URL(string: "https://api.areyouin.app/api")!
+        return URL(string: "https://rui.walkegabor.hu/api")!
         #endif
     }()
 }
