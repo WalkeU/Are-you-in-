@@ -12,6 +12,9 @@ async function main() {
         name: kink.name,
         description: kink.description,
         hasRoleVariant: kink.hasRoleVariant,
+        roleA: kink.roleA ?? null,
+        roleB: kink.roleB ?? null,
+        intensity: kink.intensity,
         order: index,
       },
     });

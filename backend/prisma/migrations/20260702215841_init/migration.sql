@@ -2,7 +2,7 @@
 CREATE TYPE "SessionStatus" AS ENUM ('PENDING', 'ACTIVE', 'COMPLETED', 'DECLINED');
 
 -- CreateEnum
-CREATE TYPE "ResponseRole" AS ENUM ('GIVE', 'RECEIVE', 'BOTH');
+CREATE TYPE "ResponseRole" AS ENUM ('ROLE_A', 'ROLE_B', 'BOTH');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -36,6 +36,8 @@ CREATE TABLE "Kink" (
     "description" TEXT NOT NULL,
     "hasRoleVariant" BOOLEAN NOT NULL DEFAULT false,
     "order" INTEGER NOT NULL DEFAULT 0,
+    "roleA" TEXT,
+    "roleB" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Kink_pkey" PRIMARY KEY ("id")

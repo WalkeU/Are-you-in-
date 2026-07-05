@@ -49,7 +49,7 @@ struct QuestionCardView: View {
 
 #Preview {
     QuestionCardView(
-        item: SessionItem(kinkId: "1", name: "Praise kink", description: "A dicséret és elismerés különösen izgató.", hasRoleVariant: true, myAnswer: nil, myRole: nil),
+        item: SessionItem(kinkId: "1", name: "Praise kink", description: "A dicséret és elismerés különösen izgató.", hasRoleVariant: true, roleA: "Dicsérek", roleB: "Dicsérnek", myAnswer: nil, myRole: nil),
         onAnswer: { _ in }
     )
     .padding()

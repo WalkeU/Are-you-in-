@@ -34,27 +34,52 @@ struct Kink: Codable, Identifiable, Equatable {
     let name: String
     let description: String
     let hasRoleVariant: Bool
+    let roleA: String?
+    let roleB: String?
+    let intensity: Int
+}
+
+/// Hardness tier for round setup: how spicy the preferences in a round are allowed to get.
+enum KinkIntensity: Int, CaseIterable, Identifiable, Codable {
+    case mild = 1
+    case bold = 2
+    case intense = 3
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .mild: return "Enyhe"
+        case .bold: return "Pikáns"
+        case .intense: return "Vad"
+        }
+    }
+
+    /// How many of the 3 flame slots are filled - a spice-level rating rather than a
+    /// single literal icon per tier, so it reads at a glance without needing a legend.
+    var filledFlameCount: Int { rawValue }
 }
 
 enum ResponseRole: String, Codable, CaseIterable, Identifiable {
-    case give = "GIVE"
-    case receive = "RECEIVE"
+    case roleA = "ROLE_A"
+    case roleB = "ROLE_B"
     case both = "BOTH"
 
     var id: String { rawValue }
 
+    /// Generic label used when kink-specific role labels are not available (e.g. history).
     var label: String {
         switch self {
-        case .give: return "Adnám"
-        case .receive: return "Kapnám"
+        case .roleA: return "A szerep"
+        case .roleB: return "B szerep"
         case .both: return "Mindkettő"
         }
     }
 
     var icon: String {
         switch self {
-        case .give: return "arrow.up.circle.fill"
-        case .receive: return "arrow.down.circle.fill"
+        case .roleA: return "person.fill"
+        case .roleB: return "person.fill.turn.right"
         case .both: return "arrow.up.arrow.down.circle.fill"
         }
     }
@@ -90,6 +115,8 @@ struct SessionItem: Codable, Identifiable, Equatable {
     let name: String
     let description: String
     let hasRoleVariant: Bool
+    let roleA: String?
+    let roleB: String?
     let myAnswer: Bool?
     let myRole: ResponseRole?
 
@@ -119,10 +146,20 @@ struct MatchResult: Codable, Identifiable, Equatable {
     let kinkId: String
     let name: String
     let description: String
+    let roleA: String?
+    let roleB: String?
     let myRole: ResponseRole?
     let partnerRole: ResponseRole?
 
     var id: String { kinkId }
+
+    func label(for role: ResponseRole) -> String {
+        switch role {
+        case .roleA: return roleA ?? role.label
+        case .roleB: return roleB ?? role.label
+        case .both: return "Mindkettő"
+        }
+    }
 }
 
 struct HistoryResponseEntry: Codable, Identifiable, Equatable {

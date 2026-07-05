@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RoleQuestionView: View {
     let itemName: String
+    let roleALabel: String
+    let roleBLabel: String
     var onSelect: (ResponseRole) -> Void
     var onSkip: () -> Void
 
@@ -11,25 +13,45 @@ struct RoleQuestionView: View {
                 Text("Milyen szerepben?")
                     .font(Theme.Typography.title)
                     .foregroundStyle(Theme.Color.textPrimary)
-                Text("\(itemName) - te inkább adnád, kapnád, vagy mindkettőre nyitott lennél?")
+                Text("\(itemName) — melyik szerep illik hozzád?")
                     .font(Theme.Typography.body)
                     .foregroundStyle(Theme.Color.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: Theme.Spacing.sm) {
-                ForEach(ResponseRole.allCases) { role in
-                    Button {
-                        onSelect(role)
-                    } label: {
-                        HStack {
-                            Image(systemName: role.icon)
-                            Text(role.label)
-                            Spacer()
-                        }
+                Button {
+                    onSelect(.roleA)
+                } label: {
+                    HStack {
+                        Image(systemName: ResponseRole.roleA.icon)
+                        Text(roleALabel)
+                        Spacer()
                     }
-                    .buttonStyle(.secondary)
                 }
+                .buttonStyle(.secondary)
+
+                Button {
+                    onSelect(.roleB)
+                } label: {
+                    HStack {
+                        Image(systemName: ResponseRole.roleB.icon)
+                        Text(roleBLabel)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.secondary)
+
+                Button {
+                    onSelect(.both)
+                } label: {
+                    HStack {
+                        Image(systemName: ResponseRole.both.icon)
+                        Text("Mindkettő")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.secondary)
             }
 
             Button("Kihagyás", action: onSkip)
@@ -39,7 +61,13 @@ struct RoleQuestionView: View {
 }
 
 #Preview {
-    RoleQuestionView(itemName: "Praise kink", onSelect: { _ in }, onSkip: {})
-        .padding()
-        .screenBackground()
+    RoleQuestionView(
+        itemName: "Praise kink",
+        roleALabel: "Domináns",
+        roleBLabel: "Szubmisszív",
+        onSelect: { _ in },
+        onSkip: {}
+    )
+    .padding()
+    .screenBackground()
 }

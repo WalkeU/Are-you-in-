@@ -98,13 +98,13 @@ struct MatchCard: View {
                 if match.myRole != nil || match.partnerRole != nil {
                     HStack(spacing: Theme.Spacing.xs) {
                         if let myRole = match.myRole, myRole == match.partnerRole {
-                            PillLabel(text: "Mindketten: \(myRole.label)", tinted: true)
+                            PillLabel(text: "Mindketten: \(match.label(for: myRole))", tinted: true)
                         } else {
                             if let myRole = match.myRole {
-                                PillLabel(text: "Te: \(myRole.label)", tinted: true)
+                                PillLabel(text: "Te: \(match.label(for: myRole))", tinted: true)
                             }
                             if let partnerRole = match.partnerRole {
-                                PillLabel(text: "\(partnerName): \(partnerRole.label)", tinted: true)
+                                PillLabel(text: "\(partnerName): \(match.label(for: partnerRole))", tinted: true)
                             }
                         }
                     }

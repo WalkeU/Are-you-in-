@@ -14,12 +14,12 @@ enum GameStage: Equatable {
 final class GameViewModel {
     let sessionId: String
 
-    /// Fixed for the lifetime of this screen - re-fetching the session reshuffles order
-    /// server-side, which would otherwise jumble the deck mid-round.
+    /// Order is assigned once server-side at session creation and stays stable across
+    /// reloads, so leaving and reopening a round resumes at the right item.
     private(set) var items: [SessionItem] = []
     private(set) var stage: GameStage = .loading
     private(set) var currentIndex: Int = 0
-    /// Non-nil while the give/receive/both follow-up sheet is being shown for `item`.
+    /// Non-nil while the role-selection follow-up sheet is being shown for `item`.
     var awaitingRoleFor: SessionItem?
 
     private let api = APIClient.shared
@@ -67,7 +67,9 @@ final class GameViewModel {
     }
 
     private func unavailableMessage(for status: SessionStatus) -> String {
-        status == .cancelled ? "A partnered kilépett, ezért a kör megszakadt." : "Ez a kör már nem elérhető."
+        // Cancellation now covers both "the partner logged out" and "nobody touched
+        // this in 12h, so the server expired it" - keep the wording neutral to both.
+        status == .cancelled ? "Ez a kör megszakadt (a partnered kilépett, vagy lejárt a kör)." : "Ez a kör már nem elérhető."
     }
 
     func answer(_ answer: Bool, role: ResponseRole?) async {

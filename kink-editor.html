@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kink Catalog Editor</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #23232e;
+    --border: #2e2e3e;
+    --accent: #7c6af7;
+    --accent-soft: #7c6af722;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #5a5a72;
+    --danger: #e05555;
+    --success: #4caf7d;
+    --warn: #e0a030;
+    --i1: #4caf7d;
+    --i2: #e0a030;
+    --i3: #e05555;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* Top bar */
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
+  .topbar h1 { font-size: 16px; font-weight: 600; color: var(--text); flex: 1; }
+  .topbar .count { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 3px 8px; border-radius: 12px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #9080ff; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger)33; }
+  .btn-danger:hover { background: var(--danger)22; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid transparent; }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 5px; width: 28px; height: 28px; justify-content: center; border-radius: 6px; }
+
+  /* Filter bar */
+  .filterbar { padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
+  .search-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 10px 7px 32px; border-radius: var(--radius); font-size: 13px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .filter-group { display: flex; gap: 6px; align-items: center; }
+  .filter-label { font-size: 12px; color: var(--text2); }
+  .chip { padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 12px; transition: all .15s; }
+  .chip.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; padding: 0 20px 80px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  thead th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border)88; transition: background .1s; cursor: default; }
+  tbody tr:hover { background: var(--surface)88; }
+  tbody tr.drag-over { background: var(--accent-soft); border-top: 2px solid var(--accent); }
+  tbody tr.dragging { opacity: .4; }
+  td { padding: 9px 10px; vertical-align: middle; }
+  td.drag-handle { color: var(--text3); cursor: grab; font-size: 16px; padding: 9px 6px; user-select: none; }
+  td.drag-handle:active { cursor: grabbing; }
+
+  /* Cells */
+  .cell-num { color: var(--text3); font-size: 12px; min-width: 28px; }
+  .cell-key { font-family: monospace; font-size: 12px; color: var(--text2); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell-name { font-weight: 500; max-width: 200px; }
+  .cell-desc { color: var(--text2); font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell-roles { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .role-pair { display: inline-flex; gap: 4px; }
+  .role-tag { background: var(--surface2); border: 1px solid var(--border); padding: 2px 7px; border-radius: 10px; font-size: 11px; }
+  .cell-actions { white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  tbody tr:hover .cell-actions { opacity: 1; }
+
+  /* Intensity badge */
+  .badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+  .badge-1 { background: var(--i1)22; color: var(--i1); }
+  .badge-2 { background: var(--i2)22; color: var(--i2); }
+  .badge-3 { background: var(--i3)22; color: var(--i3); }
+
+  /* Role variant toggle */
+  .toggle { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; }
+  .toggle-on { color: var(--accent); }
+  .toggle-off { color: var(--text3); }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: #00000088; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; transform: translateY(10px); transition: transform .2s; }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+  .modal-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .modal-header h2 { font-size: 15px; font-weight: 600; flex: 1; }
+  .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Form */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .field input, .field textarea, .field select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit; outline: none; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 72px; }
+  .field input.mono { font-family: monospace; }
+  .field .hint { font-size: 11px; color: var(--text3); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .role-fields { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface2); border-radius: var(--radius); border: 1px solid var(--border); }
+  .role-fields.hidden { display: none; }
+
+  /* Intensity radio */
+  .intensity-row { display: flex; gap: 8px; }
+  .int-opt { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface2); transition: all .15s; }
+  .int-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .int-opt input { display: none; }
+  .int-opt span { font-size: 13px; }
+
+  /* Toggle switch */
+  .switch-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .switch { width: 38px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; position: relative; transition: background .2s; flex-shrink: 0; }
+  .switch::after { content: ''; position: absolute; width: 16px; height: 16px; background: var(--text3); border-radius: 50%; top: 2px; left: 2px; transition: all .2s; }
+  input[type=checkbox]:checked + .switch { background: var(--accent); border-color: var(--accent); }
+  input[type=checkbox]:checked + .switch::after { background: #fff; transform: translateX(16px); }
+  input[type=checkbox].sr { position: absolute; opacity: 0; width: 0; height: 0; }
+
+  /* Import/Export modal */
+  .code-area { background: var(--surface2); border: 1px solid var(--border); color: #b8ffb8; padding: 12px; border-radius: var(--radius); font-family: monospace; font-size: 12px; min-height: 200px; max-height: 400px; overflow: auto; white-space: pre; resize: vertical; width: 100%; outline: none; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 20px; font-size: 13px; z-index: 999; transition: transform .3s, opacity .3s; opacity: 0; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* Empty */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
+  .empty svg { margin-bottom: 12px; color: var(--text3); }
+
+  /* Sort arrows */
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--text); }
+  .sort-icon { display: inline-block; margin-left: 4px; opacity: .4; }
+  th.sort-asc .sort-icon::after { content: '↑'; opacity: 1; }
+  th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>🗂 Kink Catalog Editor</h1>
+  <span class="count" id="countBadge">0 kink</span>
+  <button class="btn btn-ghost btn-sm" onclick="openImport()">⬆ Import .ts</button>
+  <button class="btn btn-secondary btn-sm" onclick="copyExport()">📋 Copy TS</button>
+  <button class="btn btn-secondary btn-sm" onclick="downloadExport()">⬇ Download .ts</button>
+  <button class="btn btn-primary" onclick="openAdd()">+ Új kink</button>
+</div>
+
+<!-- Filter bar -->
+<div class="filterbar">
+  <div class="search-wrap">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    <input class="search-input" id="searchInput" type="text" placeholder="Keresés név, kulcs, leírás alapján…" oninput="applyFilters()">
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Intenzitás:</span>
+    <span class="chip active" data-ifilter="all" onclick="setIntFilter(this,'all')">Mind</span>
+    <span class="chip" data-ifilter="1" onclick="setIntFilter(this,'1')">1 🟢</span>
+    <span class="chip" data-ifilter="2" onclick="setIntFilter(this,'2')">2 🟡</span>
+    <span class="chip" data-ifilter="3" onclick="setIntFilter(this,'3')">3 🔴</span>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Szerep:</span>
+    <span class="chip active" data-rfilter="all" onclick="setRoleFilter(this,'all')">Mind</span>
+    <span class="chip" data-rfilter="yes" onclick="setRoleFilter(this,'yes')">Van</span>
+    <span class="chip" data-rfilter="no" onclick="setRoleFilter(this,'no')">Nincs</span>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table id="kinkTable">
+    <thead>
+      <tr>
+        <th style="width:30px"></th>
+        <th style="width:30px" class="cell-num">#</th>
+        <th class="sortable" onclick="sortBy('key')">Kulcs <span class="sort-icon"></span></th>
+        <th class="sortable" onclick="sortBy('name')">Név <span class="sort-icon"></span></th>
+        <th style="width:48px" title="Intenzitás">Int.</th>
+        <th style="width:40px" title="Szerepválasztás">Szerep</th>
+        <th>Szerep A</th>
+        <th>Szerep B</th>
+        <th style="width:120px">Leírás</th>
+        <th style="width:80px"></th>
+      </tr>
+    </thead>
+    <tbody id="kinkBody"></tbody>
+  </table>
+  <div class="empty" id="emptyState" style="display:none">
+    <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    <p>Nincs találat</p>
+  </div>
+</div>
+
+<!-- Edit/Add Modal -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal" role="dialog">
+    <div class="modal-header">
+      <h2 id="modalTitle">Kink hozzáadása</h2>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Kulcs (key) <span style="color:var(--danger)">*</span></label>
+        <input class="mono" id="fKey" type="text" placeholder="pl. spanking" oninput="onKeyInput()">
+        <span class="hint">Egyedi slug — soha ne változtasd meg, ha már élesben fut!</span>
+      </div>
+      <div class="field">
+        <label>Magyar név <span style="color:var(--danger)">*</span></label>
+        <input id="fName" type="text" placeholder="pl. Fenékcsapkodás" oninput="autoKey()">
+      </div>
+      <div class="field">
+        <label>Leírás</label>
+        <textarea id="fDesc" placeholder="Rövid magyar leírás…"></textarea>
+      </div>
+      <div class="field">
+        <label>Intenzitás</label>
+        <div class="intensity-row">
+          <label class="int-opt">
+            <input type="radio" name="fIntensity" value="1" checked>
+            <span class="badge badge-1">1</span>
+            <span>Vanília</span>
+          </label>
+          <label class="int-opt">
+            <input type="radio" name="fIntensity" value="2">
+            <span class="badge badge-2">2</span>
+            <span>Közepes</span>
+          </label>
+          <label class="int-opt">
+            <input type="radio" name="fIntensity" value="3">
+            <span class="badge badge-3">3</span>
+            <span>Intenzív</span>
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="switch-row" for="fRoleVariant">
+          <input type="checkbox" class="sr" id="fRoleVariant" onchange="toggleRoleFields()">
+          <span class="switch"></span>
+          <span>Szerepválasztás (hasRoleVariant)</span>
+        </label>
+      </div>
+      <div class="role-fields hidden" id="roleFieldsWrap">
+        <div class="field-row">
+          <div class="field">
+            <label>Szerep A (roleA)</label>
+            <input id="fRoleA" type="text" placeholder="pl. Domináns">
+          </div>
+          <div class="field">
+            <label>Szerep B (roleB)</label>
+            <input id="fRoleB" type="text" placeholder="pl. Szubmisszív">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Mégse</button>
+      <button class="btn btn-danger btn-sm" id="deleteBtn" style="margin-right:auto;display:none" onclick="confirmDelete()">Törlés</button>
+      <button class="btn btn-primary" onclick="saveKink()">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal" role="dialog" style="max-width:640px">
+    <div class="modal-header">
+      <h2>Import kinks.ts</h2>
+      <button class="btn btn-ghost btn-icon" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text2);font-size:13px">Illeszd be a <code>kinks.ts</code> tartalmát (vagy csak a <code>KINK_CATALOG</code> tömböt). Az importálás felülírja a jelenlegi adatokat.</p>
+      <textarea class="code-area" id="importText" placeholder="Illeszd be ide a TypeScript tartalmat…" style="color:var(--text);min-height:260px"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImport()">Mégse</button>
+      <button class="btn btn-primary" onclick="doImport()">Importálás</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+let kinks = [];
+let editingIndex = null;
+let keyManuallyEdited = false;
+let activeIntFilter = 'all';
+let activeRoleFilter = 'all';
+let sortKey = null;
+let sortDir = 1;
+let dragSrcIndex = null;
+
+// ─── Initial data ─────────────────────────────────────────────────────────────
+
+const INITIAL = [
+  { key: "foot-licking", name: "Talpnyalás", description: "A partner talpának nyalása vagy csókolása okoz izgalmat.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "high-heel-fetish", name: "Magassarkú-fetis", description: "A magassarkú cipő különösen vonzó.", hasRoleVariant: false, intensity: 1 },
+  { key: "stocking-fetish", name: "Harisnyafetis", description: "Harisnya vagy combfix viselése/látványa izgató.", hasRoleVariant: false, intensity: 1 },
+  { key: "sock-fetish", name: "Zoknifetis", description: "A zoknik erotikus vonzalmat keltenek.", hasRoleVariant: false, intensity: 1 },
+  { key: "mask-fetish", name: "Maszkfetis", description: "Maszkok viselése erotikus élményt ad.", hasRoleVariant: false, intensity: 1 },
+  { key: "latex-fetish", name: "Latexfetis", description: "A latex ruházat látványa vagy viselése izgató.", hasRoleVariant: false, intensity: 1 },
+  { key: "glasses-fetish", name: "Szemüvegfetis", description: "A szemüveg különösen vonzó.", hasRoleVariant: false, intensity: 1 },
+  { key: "spit-play", name: "Nyáljáték", description: "A nyállal kapcsolatos játékok okoznak izgalmat.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "leather-fetish", name: "Bőrruha-fetis", description: "A bőrből készült ruházat erotikus.", hasRoleVariant: false, intensity: 1 },
+  { key: "collar", name: "Nyakörv", description: "Nyakörv viselése a szerepjáték része.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "ruined-orgasm", name: "Ruined orgasm", description: "Az orgazmust szándékosan megszakítják vagy csökkentik.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "tickling", name: "Csiklandozás", description: "A csiklandozás okoz izgalmat.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "face-spitting", name: "Arcköpés", description: "A partner arcára köpés része a dinamikának.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "mouth-spitting", name: "Szájba köpés", description: "A partner szájába köpés.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "slapping", name: "Pofon", description: "Enyhe arcpofonok okoznak izgalmat.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "spanking", name: "Fenékcsapkodás", description: "Erősebb fenékütések iránti érdeklődés.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "ball-squeezing", name: "Hereszorítás (Ball squeezing)", description: "A herék kézzel vagy erre alkalmas eszközzel történő kontrollált szorítása része a játéknak.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "nipple-clamps", name: "Mellbimbócsipeszek", description: "Csipeszekkel fokozzák a mellbimbó érzékenységét.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "ball-busting", name: "Herék ütése (Ball busting)", description: "A herék kontrollált ütése, rúgása vagy csapkodása okoz izgalmat egyesek számára.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "nipple-play", name: "Mellbimbó-játék", description: "A mellbimbók ingerlése áll a középpontban.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "clothed-facesitting", name: "Clothed facesitting", description: "Amikor valaki ruhában vagy alsóneműben ül a partner arcára.", hasRoleVariant: true, intensity: 1, roleA: "Ül", roleB: "Alatta" },
+  { key: "wax-play", name: "Viaszjáték", description: "Meleg gyertyaviaszt cseppentenek a bőrre.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "ice-play", name: "Jégjáték", description: "Hideg tárgyakkal fokozzák az érzékelést.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "blindfold", name: "Szemkötő", description: "A látás kizárása növeli az izgalmat.", hasRoleVariant: true, intensity: 1, roleA: "Köti", roleB: "Viseli" },
+  { key: "handcuffs", name: "Bilincs használata", description: "A partner mozgását bilincs korlátozza.", hasRoleVariant: true, intensity: 1, roleA: "Megbilincsel", roleB: "Bilincses" },
+  { key: "rope-bondage", name: "Kötéllel kötözés", description: "A test kötéllel történő megkötése része a játéknak.", hasRoleVariant: true, intensity: 2, roleA: "Köt", roleB: "Kötözött" },
+  { key: "gag", name: "Szájpecek (Gag)", description: "A beszéd korlátozása fokozza az élményt.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "orgasm-control", name: "Orgazmuskontroll", description: "Az egyik fél irányítja, mikor vagy hogy a másik elélvezhet-e.", hasRoleVariant: true, intensity: 2, roleA: "Irányít", roleB: "Engedelmeskedik" },
+  { key: "edging", name: "Edging", description: "Az orgazmus közelébe viszik a partnert, majd megállnak, ezt többször ismétlik.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "clothed-femdom", name: "Clothed femdom", description: "Tágabb kategória, amelyben a domináns nő végig felöltözve marad; ennek egyik eleme lehet a ruhában történő facesitting.", hasRoleVariant: true, intensity: 2, roleA: "Domina", roleB: "Szubmisszív" },
+  { key: "overstimulation", name: "Overstimulation", description: "Az orgazmus után is folytatódó ingerlés, amely a túlérzékenységgel jár.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "rough-glans-stimulation", name: "Rough glans stimulation", description: "A makk erőteljes ingerlése tenyérrel vagy egyéb módon.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "rough-clitoral-stimulation", name: "Rough clitoral stimulation", description: "A csikló intenzív vagy akár fájdalmas ingerlése.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "anal-sex", name: "Anális szex (Anal sex)", description: "Amikor a szexuális behatolás a végbélen keresztül történik.", hasRoleVariant: true, intensity: 1, roleA: "Aktív", roleB: "Passzív" },
+  { key: "tease-and-denial", name: "Tease and denial", description: "Folyamatos ingerlés történik, de az orgazmust hosszabb ideig nem engedik.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "chastity", name: "Chastity", description: "Zárható eszközzel ideiglenesen megakadályozzák a szexuális kielégülést.", hasRoleVariant: true, intensity: 2, roleA: "Zárolja", roleB: "Viseli" },
+  { key: "praise-kink", name: "Praise kink", description: "A dicséret és elismerés különösen izgató.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "humiliation", name: "Megalázás (Humiliation)", description: "A megalázó helyzetek vagy szavak erotikusak.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "verbal-humiliation", name: "Verbális megalázás", description: "Kifejezetten sértő vagy lealacsonyító beszéd része a játéknak.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "degradation", name: "Degradation", description: "A partner alacsonyabb státuszúnak kezelése izgató.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "worship", name: "Worship", description: "A partner testének vagy egy részének imádata, tisztelete erotikus.", hasRoleVariant: true, intensity: 1, roleA: "Imád", roleB: "Imádják" },
+  { key: "foot-worship", name: "Lábimádat (Foot worship)", description: "A lábak csókolása, nyalása vagy masszírozása áll a középpontban.", hasRoleVariant: true, intensity: 1, roleA: "Imád", roleB: "Imádják" },
+  { key: "facesitting", name: "Arcra ülés (Facesitting)", description: "Az egyik partner a másik arcára ül orális szex közben.", hasRoleVariant: true, intensity: 2, roleA: "Ül", roleB: "Alatta" },
+  { key: "queening", name: "Queening", description: "Facesitting domináns fókuszban: az ülő fél aktívan mozog, súlyt helyez a partnerre, irányít – a kontroll és a hatalom kerül előtérbe.", hasRoleVariant: true, intensity: 3, roleA: "Ül", roleB: "Alatta" },
+  { key: "pet-play", name: "Pet play", description: "Az egyik fél háziállatként (pl. kutya, macska) viselkedik szerepjátékban.", hasRoleVariant: true, intensity: 2, roleA: "Gazda", roleB: "Kisállat" },
+  { key: "furry-roleplay", name: "Furry roleplay", description: "Állatszerű karakterek vagy jelmezek szerepelnek az erotikus játékban.", hasRoleVariant: true, intensity: 1, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "age-play", name: "Age play", description: "A résztvevők eltérő életkorú szerepeket játszanak el; ez kizárólag beleegyező felnőttek között történik.", hasRoleVariant: true, intensity: 2, roleA: "Gondozó", roleB: "Kicsi" },
+  { key: "forced-orgasm", name: "Forced orgasm", description: "Az orgazmus ismételt kiváltása a beleegyezett játék részeként.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "mommy-dynamic", name: "Mommy dinamika", description: "Gondoskodó–irányító szerep.", hasRoleVariant: true, intensity: 2, roleA: "Mommy", roleB: "Kicsi" },
+  { key: "daddy-dynamic", name: "Daddy dinamika", description: "Gondoskodó–irányító szerep.", hasRoleVariant: true, intensity: 2, roleA: "Daddy", roleB: "Kicsi" },
+  { key: "cuckold-fantasy", name: "Cuckold fantázia", description: "Izgalmat okoz a gondolat vagy helyzet, hogy a partner mással létesít szexuális kapcsolatot.", hasRoleVariant: false, intensity: 2 },
+  { key: "hotwife-fantasy", name: "Hotwife fantázia", description: "A pár egyik tagját izgatja, hogy a női partner más férfiakkal létesít kapcsolatot.", hasRoleVariant: false, intensity: 2 },
+  { key: "exhibitionism", name: "Exhibitionizmus", description: "Az izgalom abból ered, hogy mások előtt mutatják meg magukat (csak beleegyező környezetben).", hasRoleVariant: false, intensity: 1 },
+  { key: "roleplay", name: "Roleplay", description: "Kitalált szerepek (pl. tanár–diák, főnök–alkalmazott) eljátszása.", hasRoleVariant: false, intensity: 1 },
+  { key: "primal-play", name: "Primal play", description: "Civilizált szerepek helyett ösztönös, ragadozó–préda jellegű játék, gyakran morgással, üldözéssel vagy birkózással.", hasRoleVariant: true, intensity: 2, roleA: "Vadász", roleB: "Préda" },
+  { key: "prostate-play", name: "Prostate play", description: "A prosztata ingerlése áll a középpontban.", hasRoleVariant: true, intensity: 1, roleA: "Aktív", roleB: "Passzív" },
+  { key: "sounding", name: "Sounding", description: "Speciális eszköz bevezetése a húgycsőbe erotikus célból.", hasRoleVariant: true, intensity: 3, roleA: "Aktív", roleB: "Passzív" },
+  { key: "golden-shower", name: "Aranyzuhany (Golden shower)", description: "A vizelet egyik partnerről a másikra kerül a kölcsönösen elfogadott játék részeként.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "sweat-fetish", name: "Izzadságfetis", description: "Az izzadság szaga, érintése vagy látványa erotikus vonzalmat vált ki.", hasRoleVariant: false, intensity: 1 },
+  { key: "chocolate-play", name: "Csokoládéjáték", description: "Csokoládé bevonása a játékba.", hasRoleVariant: false, intensity: 1 },
+  { key: "whipped-cream-play", name: "Tejszínhab-játék", description: "Tejszínhab használata érzéki játékként.", hasRoleVariant: false, intensity: 1 },
+  { key: "oil-massage", name: "Olajmasszázs", description: "Illó- vagy masszázsolaj használata erotikus célból.", hasRoleVariant: true, intensity: 1, roleA: "Masszőr", roleB: "Masszírozott" },
+  { key: "mirror-play", name: "Tükör előtt", description: "A saját vagy partner látványa fokozza az élményt.", hasRoleVariant: false, intensity: 1 },
+  { key: "public-fantasy", name: "Nyilvános hely fantázia", description: "Mások közelsége fokozza az izgalmat (csak jogszerű és beleegyező helyzetekben).", hasRoleVariant: false, intensity: 2 },
+  { key: "remote-controlled-toys", name: "Távirányítású eszközök", description: "Partner által irányított eszközök használata.", hasRoleVariant: true, intensity: 1, roleA: "Irányít", roleB: "Visel" },
+  { key: "cosplay", name: "Cosplay", description: "Ismert karakterek jelmezének erotikus használata.", hasRoleVariant: false, intensity: 1 },
+  { key: "open-relationship", name: "Nyitott kapcsolat", description: "A kapcsolat enged más partnereket is.", hasRoleVariant: false, intensity: 2 },
+  { key: "swinger-lifestyle", name: "Swinger életmód", description: "Párok közötti partnercsere közös beleegyezéssel.", hasRoleVariant: false, intensity: 2 },
+  { key: "maid-roleplay", name: "Szobalány szerepjáték", description: "Kiszolgáló szerep eljátszása.", hasRoleVariant: true, intensity: 1, roleA: "Gazda", roleB: "Szobalány" },
+  { key: "doctor-patient-roleplay", name: "Orvos–beteg szerepjáték", description: "Egészségügyi szerepek eljátszása.", hasRoleVariant: true, intensity: 1, roleA: "Orvos", roleB: "Beteg" },
+  { key: "teacher-student-roleplay", name: "Tanár–diák szerepjáték", description: "Előre megbeszélt szerepek eljátszása.", hasRoleVariant: true, intensity: 1, roleA: "Tanár", roleB: "Diák" },
+  { key: "smothering-fetish", name: "Smothering fetish", description: "Olyan kink, amelyben az egyik fél számára izgalmat jelent a légzés részleges korlátozásának érzete a partner testével.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "breast-squeezing", name: "Breast squeezing", description: "A mellek erőteljes szorítása.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "cum-eating", name: "Cum eating", description: "A saját ejakulátum lenyelése erotikus élményt jelent.", hasRoleVariant: false, intensity: 2 },
+  { key: "cum-feeding", name: "Cum feeding", description: "Az egyik partner a másik partnerrel lenyeleti az ejakulátumot a közösen elfogadott játék részeként.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "snowballing", name: "Snowballing", description: "Az ejakulátum csókolózás közbeni átadása a partnerek között.", hasRoleVariant: false, intensity: 2 },
+  { key: "breath-play", name: "Breath play", description: "A légzés kontrolljával vagy korlátozásának érzetével kapcsolatos, előre egyeztetett játék.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "cfnm", name: "CFNM (Clothed Female, Naked Male)", description: "A nő felöltözve marad, míg a férfi meztelen; a ruházati kontraszt áll a középpontban.", hasRoleVariant: false, intensity: 1 },
+  { key: "cmnf", name: "CMNF (Clothed Male, Naked Female)", description: "A férfi felöltözve marad, míg a nő meztelen; a ruházati kontraszt okoz izgalmat.", hasRoleVariant: false, intensity: 1 },
+  { key: "bdsm", name: "BDSM", description: "Átfogó érdeklődés a BDSM különböző formái iránt, nem egyetlen konkrét kinkre korlátozva.", hasRoleVariant: false, intensity: 2 },
+  { key: "dom-sub-dynamic", name: "Dominancia–szubmisszió (D/s dinamika)", description: "Hosszabb távú alá- és fölérendeltségi szerepek, szabályokkal, jutalmazással vagy büntetéssel.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "joi", name: "JOI (Jerk Off Instruction)", description: "Az egyik partner utasításokat ad a másiknak az önkielégítéshez.", hasRoleVariant: true, intensity: 1, roleA: "Utasít", roleB: "Teljesíti" },
+  { key: "tease-only", name: "Tease only / No-touch teasing", description: "Az egyik partner csak nézheti a másik önkielégítését vagy erotikus játékát, de nem érhet hozzá.", hasRoleVariant: true, intensity: 1, roleA: "Mutat", roleB: "Nézi" },
+  { key: "head-scissors", name: "Head scissors (Head scissoring)", description: "A partner fejének a combok közötti kontrollált leszorítása a játék részeként.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "post-orgasm-torture", name: "Post-orgasm torture", description: "Az orgazmus után is folytatódó intenzív ingerlés, amely a túlérzékenységre épül.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "mutual-masturbation", name: "Mutual masturbation", description: "A partnerek egymás jelenlétében, kölcsönösen végeznek önkielégítést.", hasRoleVariant: false, intensity: 1 },
+  { key: "paddle", name: "Paddle", description: "Lapos ütőeszközzel adott kontrollált ütések okoznak izgalmat.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "findom", name: "Findom (Financial domination)", description: "A domináns fél pénzügyi kontrollja vagy ajándékok, pénz átadása a beleegyezett dinamika részeként okoz izgalmat.", hasRoleVariant: true, intensity: 2, roleA: "Domina", roleB: "Fizető" },
+  { key: "flogging", name: "Flogging", description: "Többszálú korbáccsal adott kontrollált ütések a játék részei.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "cnc", name: "CNC (Consensual Non-Consent)", description: "Előre részletesen egyeztetett szerepjáték, amely a beleegyezésen alapuló, nem beleegyezésnek tűnő helyzeteket jeleníti meg.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "voyeurism", name: "Voyeurizmus (Voyeurism)", description: "Mások intim vagy szexuális tevékenységének beleegyezéssel történő megfigyelése okoz izgalmat.", hasRoleVariant: false, intensity: 1 },
+  { key: "dryhumping", name: "Dryhumping (Frottázs)", description: "A testek egymáshoz dörzsölése ruhában vagy részben felöltözve okoz izgalmat.", hasRoleVariant: false, intensity: 1 },
+
+  { key: "femdom", name: "Femdom", description: "Általános női dominancia, ahol a nő átveszi az irányítást a szexuális dinamikában.", hasRoleVariant: true, intensity: 2, roleA: "Domina", roleB: "Szubmisszív" },
+  { key: "gentle-femdom", name: "Gentle Femdom (GFD)", description: "Gyengéd, gondoskodó, szeretetteljes dominancia – az irányítás nem büntetésen, hanem törődésen alapul.", hasRoleVariant: true, intensity: 1, roleA: "Domina", roleB: "Szubmisszív" },
+  { key: "service-submission", name: "Service submission", description: "Az egyik fél kiszolgálja a másikat: masszázs, italok elkészítése, cipőhúzás, testi gondoskodás.", hasRoleVariant: true, intensity: 1, roleA: "Kiszolgált", roleB: "Kiszolgáló" },
+  { key: "domestic-servitude", name: "Domestic servitude", description: "A házimunka (takarítás, főzés, rendrakás) beleegyezett hatalmi dinamika részeként jelenik meg.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szolgál" },
+  { key: "brat-dynamic", name: "Brat / Brat Tamer", description: "A makacs szubmisszív (Brat) szándékosan provokál; a domináns (Brat Tamer) reagál rá – versengő, játékos hatalmi dinamika.", hasRoleVariant: true, intensity: 2, roleA: "Brat Tamer", roleB: "Brat" },
+  { key: "protocol", name: "Protokoll (D/s)", description: "Formalizált viselkedési szabályok, rituálék és udvariassági normák a domináns–szubmisszív kapcsolatban.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "obedience-training", name: "Engedelmességi tréning", description: "Rendszeres, strukturált engedelmességi gyakorlatok a szubmisszív számára.", hasRoleVariant: true, intensity: 2, roleA: "Edző", roleB: "Tanuló" },
+  { key: "tpe", name: "TPE (Total Power Exchange)", description: "Teljes hatalomátadás: a domináns átveszi az irányítást az élet szinte minden területén, kölcsönös beleegyezéssel.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "mirror-domination", name: "Tükrös dominancia", description: "Tükör előtt zajló dominancia-játék, ahol a látvány – a szubmisszív saját tükörképe – a megalázás vagy kontroll eszköze.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "erotic-hypnosis", name: "Erotikus hipnózis", description: "Hipnózis vagy hipnózisszerű állapot alkalmazása az erotikus élmény fokozásához.", hasRoleVariant: true, intensity: 2, roleA: "Hipnotizőr", roleB: "Szubmisszív" },
+  { key: "free-use-fantasy", name: "Free use fantázia", description: "Az egyik fél beleegyezetten bármikor rendelkezésre áll a másik számára, bármilyen szexuális célból.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "shibari", name: "Shibari", description: "A japán kötözés esztétikája: a kötelék vizuális szépsége, a rituálé és az érzelmi kapcsolat a középpont.", hasRoleVariant: true, intensity: 2, roleA: "Rigger", roleB: "Bunny" },
+  { key: "impact-play", name: "Impact play", description: "Általános érdeklődés az ütéssel járó játékok iránt (spanking, korbács, paddle, cane stb.).", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "riding-crop", name: "Lovaglóostor (Riding crop)", description: "Lovaglóostorral adott kontrollált ütések az erotikus dinamika részeként.", hasRoleVariant: true, intensity: 2, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "cane-play", name: "Cane play", description: "Vékony nádpálcával vagy bottal adott kontrollált ütések okoznak izgalmat.", hasRoleVariant: true, intensity: 3, roleA: "Domináns", roleB: "Szubmisszív" },
+  { key: "sensory-play", name: "Sensory play", description: "Az érzékszervek célzott ingerlése (tapintás, hő, vibráció, textúrák) fokozza az élményt.", hasRoleVariant: true, intensity: 1, roleA: "Irányít", roleB: "Átéli" },
+  { key: "sensory-deprivation", name: "Érzékszervi megfosztás (Sensory deprivation)", description: "A látás, hallás vagy tapintás részleges/teljes kizárása – az elvont érzékek helyett a maradók felerősödnek.", hasRoleVariant: true, intensity: 2, roleA: "Irányít", roleB: "Átéli" },
+  { key: "boot-worship", name: "Csizmaimádat (Boot worship)", description: "Csizmák és cipők csókolása, nyalása, tisztítása a beleegyezett imádó dinamika részeként.", hasRoleVariant: true, intensity: 1, roleA: "Imád", roleB: "Imádják" },
+  { key: "size-difference-fantasy", name: "Méretbeli különbség fantázia", description: "A partnerek testi méretbeli eltérése (magasság, testalkat) erotikus vonzalmat kelt.", hasRoleVariant: false, intensity: 1 },
+  { key: "kitchen-play", name: "Konyhai játék", description: "Erotikus tevékenység vagy szex a konyhában – a hétköznapi helyszín adja az izgalmat.", hasRoleVariant: false, intensity: 1 },
+  { key: "shower-play", name: "Zuhanyzós játék", description: "Erotikus tevékenység zuhanyzás közben vagy alatt.", hasRoleVariant: false, intensity: 1 },
+  { key: "car-sex-fantasy", name: "Autós szex fantázia", description: "Autóban való szexuális tevékenység – a szűk tér és a félelem az elfogástól fokozza az izgalmat.", hasRoleVariant: false, intensity: 1 },
+  { key: "hotel-sex-fantasy", name: "Hoteles szex fantázia", description: "Hotelszobában való szex izgalma: anonimitás, idegen környezet, a hétköznapitól való elszakadás.", hasRoleVariant: false, intensity: 1 },
+  { key: "uniform-fetish", name: "Egyenruha-fetis", description: "Egyenruhák (rendőr, katona, orvos, pilóta stb.) viselése erotikus izgalmat kelt.", hasRoleVariant: false, intensity: 1 },
+  { key: "lingerie-fetish", name: "Fehérnemű-fetis (Lingerie)", description: "Fehérnemű, hálóing vagy egyéb intim ruhadarabok látványa különösen izgató.", hasRoleVariant: false, intensity: 1 },
+];
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  return kinks.filter((k, i) => {
+    const matchSearch = !q || k.key.toLowerCase().includes(q) || k.name.toLowerCase().includes(q) || (k.description||'').toLowerCase().includes(q);
+    const matchInt = activeIntFilter === 'all' || String(k.intensity) === activeIntFilter;
+    const matchRole = activeRoleFilter === 'all' || (activeRoleFilter === 'yes' ? k.hasRoleVariant : !k.hasRoleVariant);
+    return matchSearch && matchInt && matchRole;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+  const tbody = document.getElementById('kinkBody');
+  document.getElementById('countBadge').textContent = kinks.length + ' kink';
+  document.getElementById('emptyState').style.display = filtered.length === 0 ? '' : 'none';
+
+  tbody.innerHTML = filtered.map((k, fi) => {
+    const realIndex = kinks.indexOf(k);
+    return `<tr draggable="true" data-index="${realIndex}"
+      ondragstart="dragStart(event,${realIndex})"
+      ondragover="dragOver(event,${realIndex})"
+      ondragleave="dragLeave(event)"
+      ondrop="dragDrop(event,${realIndex})"
+      ondragend="dragEnd(event)">
+      <td class="drag-handle" title="Húzd át az átrendezéshez">⠿</td>
+      <td class="cell-num">${realIndex + 1}</td>
+      <td class="cell-key">${esc(k.key)}</td>
+      <td class="cell-name">${esc(k.name)}</td>
+      <td><span class="badge badge-${k.intensity}">${k.intensity}</span></td>
+      <td>
+        <span class="toggle ${k.hasRoleVariant ? 'toggle-on' : 'toggle-off'}" title="${k.hasRoleVariant ? 'Van szerepválasztás' : 'Nincs szerepválasztás'}">
+          ${k.hasRoleVariant ? '●' : '○'}
+        </span>
+      </td>
+      <td class="cell-roles">${k.hasRoleVariant && k.roleA ? `<span class="role-tag">${esc(k.roleA)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td class="cell-roles">${k.hasRoleVariant && k.roleB ? `<span class="role-tag">${esc(k.roleB)}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td class="cell-desc" title="${esc(k.description)}">${esc(k.description)}</td>
+      <td class="cell-actions">
+        <button class="btn btn-ghost btn-icon btn-sm" title="Szerkesztés" onclick="openEdit(${realIndex})">✏️</button>
+        <button class="btn btn-ghost btn-icon btn-sm" title="Másolás" onclick="duplicateKink(${realIndex})">⧉</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Filters & Sort ───────────────────────────────────────────────────────────
+
+function applyFilters() { render(); }
+
+function setIntFilter(el, val) {
+  document.querySelectorAll('[data-ifilter]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  activeIntFilter = val;
+  render();
+}
+
+function setRoleFilter(el, val) {
+  document.querySelectorAll('[data-rfilter]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  activeRoleFilter = val;
+  render();
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  kinks.sort((a,b) => {
+    const av = (a[key]||'').toString().toLowerCase();
+    const bv = (b[key]||'').toString().toLowerCase();
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+  document.querySelectorAll('th').forEach(th => { th.classList.remove('sort-asc','sort-desc'); });
+  const ths = document.querySelectorAll('th.sortable');
+  ths.forEach(th => { if (th.onclick?.toString().includes(`'${key}'`)) th.classList.add(sortDir>0?'sort-asc':'sort-desc'); });
+  render();
+}
+
+// ─── Drag & Drop reorder ──────────────────────────────────────────────────────
+
+function dragStart(e, idx) {
+  dragSrcIndex = idx;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function dragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('tr.drag-over').forEach(r => r.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function dragEnd(e) { document.querySelectorAll('tr.dragging,tr.drag-over').forEach(r => r.classList.remove('dragging','drag-over')); }
+function dragDrop(e, targetIdx) {
+  e.preventDefault();
+  if (dragSrcIndex === null || dragSrcIndex === targetIdx) return;
+  const item = kinks.splice(dragSrcIndex, 1)[0];
+  const insertAt = dragSrcIndex < targetIdx ? targetIdx : targetIdx;
+  kinks.splice(insertAt, 0, item);
+  dragSrcIndex = null;
+  render();
+}
+
+// ─── Modal: Add / Edit ────────────────────────────────────────────────────────
+
+function openAdd() {
+  editingIndex = null;
+  keyManuallyEdited = false;
+  document.getElementById('modalTitle').textContent = 'Új kink hozzáadása';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('fKey').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fRoleVariant').checked = false;
+  document.getElementById('fRoleA').value = '';
+  document.getElementById('fRoleB').value = '';
+  document.querySelector('input[name=fIntensity][value="1"]').checked = true;
+  toggleRoleFields();
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(() => document.getElementById('fName').focus(), 100);
+}
+
+function openEdit(idx) {
+  const k = kinks[idx];
+  editingIndex = idx;
+  keyManuallyEdited = true;
+  document.getElementById('modalTitle').textContent = 'Kink szerkesztése';
+  document.getElementById('deleteBtn').style.display = '';
+  document.getElementById('fKey').value = k.key;
+  document.getElementById('fName').value = k.name;
+  document.getElementById('fDesc').value = k.description || '';
+  document.getElementById('fRoleVariant').checked = k.hasRoleVariant;
+  document.getElementById('fRoleA').value = k.roleA || '';
+  document.getElementById('fRoleB').value = k.roleB || '';
+  document.querySelector(`input[name=fIntensity][value="${k.intensity}"]`).checked = true;
+  toggleRoleFields();
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(() => document.getElementById('fName').focus(), 100);
+}
+
+function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+function toggleRoleFields() {
+  const on = document.getElementById('fRoleVariant').checked;
+  document.getElementById('roleFieldsWrap').classList.toggle('hidden', !on);
+}
+
+let autoKeyLock = false;
+function autoKey() {
+  if (keyManuallyEdited) return;
+  const name = document.getElementById('fName').value;
+  const slug = name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s-]/g,'')
+    .trim().replace(/\s+/g,'-');
+  autoKeyLock = true;
+  document.getElementById('fKey').value = slug;
+  autoKeyLock = false;
+}
+
+function onKeyInput() {
+  if (!autoKeyLock) keyManuallyEdited = document.getElementById('fKey').value.length > 0;
+}
+
+function saveKink() {
+  const key = document.getElementById('fKey').value.trim();
+  const name = document.getElementById('fName').value.trim();
+  if (!key || !name) { showToast('A kulcs és a név kötelező!', 'error'); return; }
+
+  // Duplicate key check
+  const dupIdx = kinks.findIndex((k,i) => k.key === key && i !== editingIndex);
+  if (dupIdx !== -1) { showToast('Ez a kulcs már létezik!', 'error'); return; }
+
+  const intensity = parseInt(document.querySelector('input[name=fIntensity]:checked').value);
+  const hasRoleVariant = document.getElementById('fRoleVariant').checked;
+  const roleA = hasRoleVariant ? document.getElementById('fRoleA').value.trim() || undefined : undefined;
+  const roleB = hasRoleVariant ? document.getElementById('fRoleB').value.trim() || undefined : undefined;
+
+  const item = { key, name, description: document.getElementById('fDesc').value.trim(), hasRoleVariant, intensity, ...(roleA && { roleA }), ...(roleB && { roleB }) };
+
+  if (editingIndex !== null) {
+    kinks[editingIndex] = item;
+  } else {
+    kinks.push(item);
+  }
+  closeModal();
+  render();
+  showToast(editingIndex !== null ? 'Mentve!' : 'Hozzáadva!', 'success');
+}
+
+function confirmDelete() {
+  if (!confirm(`Biztosan törlöd: "${kinks[editingIndex].name}"?`)) return;
+  kinks.splice(editingIndex, 1);
+  closeModal();
+  render();
+  showToast('Törölve.', 'success');
+}
+
+function duplicateKink(idx) {
+  const orig = { ...kinks[idx] };
+  orig.key = orig.key + '-copy';
+  kinks.splice(idx + 1, 0, orig);
+  render();
+  showToast('Másolat létrehozva.', 'success');
+  openEdit(idx + 1);
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function buildTS() {
+  const header = `export interface KinkSeed {
+  key: string;
+  name: string;
+  description: string;
+  hasRoleVariant: boolean;
+  /** Difficulty/hardness tier: 1 = vanilla, 2 = harder, 3 = the really intense stuff. */
+  intensity: 1 | 2 | 3;
+  /** Display label for the first selectable role (shown instead of generic "Adnám"). */
+  roleA?: string;
+  /** Display label for the second selectable role (shown instead of generic "Kapnám"). */
+  roleB?: string;
+}
+
+/**
+ * Canonical kink/preference catalog. \`key\` is a stable slug used for seeding
+ * (safe to re-run) - never reuse a key for a different item once shipped,
+ * since existing Response/Match rows reference the resulting Kink.id.
+ *
+ * \`roleA\` / \`roleB\` are the role-selection labels shown when \`hasRoleVariant\` is true.
+ */
+export const KINK_CATALOG: KinkSeed[] = [`;
+
+  const lines = kinks.map(k => {
+    const parts = [
+      `key: ${JSON.stringify(k.key)}`,
+      `name: ${JSON.stringify(k.name)}`,
+      `description: ${JSON.stringify(k.description || '')}`,
+      `hasRoleVariant: ${k.hasRoleVariant}`,
+      `intensity: ${k.intensity}`,
+    ];
+    if (k.hasRoleVariant && k.roleA) parts.push(`roleA: ${JSON.stringify(k.roleA)}`);
+    if (k.hasRoleVariant && k.roleB) parts.push(`roleB: ${JSON.stringify(k.roleB)}`);
+    return `  { ${parts.join(', ')} },`;
+  });
+
+  return header + '\n' + lines.join('\n') + '\n];\n';
+}
+
+function copyExport() {
+  navigator.clipboard.writeText(buildTS()).then(() => showToast('Vágólapra másolva!', 'success'), () => showToast('Másolás sikertelen.', 'error'));
+}
+
+function downloadExport() {
+  const blob = new Blob([buildTS()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kinks.ts';
+  a.click();
+  showToast('Letöltés megkezdve.', 'success');
+}
+
+// ─── Import ───────────────────────────────────────────────────────────────────
+
+function openImport() { document.getElementById('importText').value = ''; document.getElementById('importModal').classList.add('open'); }
+function closeImport() { document.getElementById('importModal').classList.remove('open'); }
+
+function doImport() {
+  const raw = document.getElementById('importText').value;
+  try {
+    // Extract the array literal
+    const match = raw.match(/KINK_CATALOG[^=]*=\s*(\[[\s\S]*?\]);/) ||
+                  raw.match(/(\[[\s\S]*?\]);?\s*$/);
+    if (!match) throw new Error('Nem található KINK_CATALOG tömb');
+    // Safely evaluate only the array using Function
+    const parsed = Function('"use strict"; return (' + match[1] + ')')();
+    if (!Array.isArray(parsed)) throw new Error('Nem tömb az eredmény');
+    kinks = parsed.map(k => ({
+      key: k.key, name: k.name, description: k.description || '',
+      hasRoleVariant: !!k.hasRoleVariant,
+      intensity: k.intensity || 1,
+      ...(k.roleA && { roleA: k.roleA }),
+      ...(k.roleB && { roleB: k.roleB }),
+    }));
+    closeImport();
+    render();
+    showToast(`${kinks.length} kink importálva!`, 'success');
+  } catch(e) {
+    showToast('Import hiba: ' + e.message, 'error');
+  }
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+let toastTimer;
+function showToast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ─── Keyboard ────────────────────────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeImport(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); copyExport(); }
+});
+
+// ─── Close on backdrop click ─────────────────────────────────────────────────
+
+document.getElementById('editModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('importModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+kinks = INITIAL.map(k => ({ ...k }));
+render();
+</script>
+</body>
+</html>

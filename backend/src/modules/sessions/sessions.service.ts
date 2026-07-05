@@ -3,7 +3,7 @@ import { AppError } from "../../utils/errors";
 import { shuffle } from "../../utils/shuffle";
 import type { ResponseRole } from "@prisma/client";
 
-const kinkSelect = { id: true, name: true, description: true, hasRoleVariant: true } as const;
+const kinkSelect = { id: true, name: true, description: true, hasRoleVariant: true, roleA: true, roleB: true } as const;
 
 async function getSessionOrThrow(sessionId: string) {
   const session = await prisma.gameSession.findUnique({
@@ -20,7 +20,23 @@ function assertParticipant(session: { initiatorId: string; partnerId: string }, 
   }
 }
 
-export async function createSession(initiatorId: string, itemCount: number) {
+/**
+ * Both wanting "yes" isn't enough for a role-variant kink - two people both wanting to
+ * take the same role can't actually happen together. A missing role
+ * (no role variant, or the picker was skipped) is treated as flexible/compatible with
+ * anything; only ROLE_A+ROLE_A and ROLE_B+ROLE_B are excluded.
+ */
+function rolesAreCompatible(roleA: ResponseRole | null, roleB: ResponseRole | null): boolean {
+  if (!roleA || !roleB || roleA === "BOTH" || roleB === "BOTH") return true;
+  return roleA !== roleB;
+}
+
+export async function createSession(
+  initiatorId: string,
+  itemCount: number,
+  maxIntensity: number = 1,
+  exactIntensity: boolean = false,
+) {
   const initiator = await prisma.user.findUniqueOrThrow({ where: { id: initiatorId } });
   if (!initiator.partnerId) {
     throw AppError.badRequest("You need a paired partner before starting a session");
@@ -39,12 +55,25 @@ export async function createSession(initiatorId: string, itemCount: number) {
     throw AppError.conflict("There is already an in-progress session with your partner", { sessionId: existing.id });
   }
 
-  const totalKinks = await prisma.kink.count();
-  if (totalKinks === 0) throw AppError.badRequest("Kink catalog is empty; run the database seed first");
+  // "Exact" draws only from that one tier; otherwise anything at or below the chosen
+  // hardness is fair game, like a spice-level cap rather than a single fixed shelf.
+  const intensityFilter = exactIntensity ? { equals: maxIntensity } : { lte: maxIntensity };
+
+  const totalKinks = await prisma.kink.count({ where: { intensity: intensityFilter } });
+  if (totalKinks === 0) {
+    throw AppError.badRequest("No items match the selected intensity; try a different setting");
+  }
   const clampedCount = Math.min(itemCount, totalKinks);
 
-  const allKinkIds = await prisma.kink.findMany({ select: { id: true } });
+  const allKinkIds = await prisma.kink.findMany({ where: { intensity: intensityFilter }, select: { id: true } });
   const chosenIds = shuffle(allKinkIds).slice(0, clampedCount);
+
+  // Each participant gets their own independently-shuffled viewing order, generated once
+  // here and stored, so resuming after a re-fetch (e.g. leaving and reopening the round)
+  // continues in the same order instead of jumbling the deck on every load.
+  const positions = chosenIds.map((_, i) => i);
+  const initiatorOrders = shuffle(positions);
+  const partnerOrders = shuffle(positions);
 
   const session = await prisma.gameSession.create({
     data: {
@@ -52,7 +81,13 @@ export async function createSession(initiatorId: string, itemCount: number) {
       partnerId: initiator.partnerId,
       itemCount: clampedCount,
       status: "PENDING",
-      items: { create: chosenIds.map((k) => ({ kinkId: k.id })) },
+      items: {
+        create: chosenIds.map((k, idx) => ({
+          kinkId: k.id,
+          initiatorOrder: initiatorOrders[idx],
+          partnerOrder: partnerOrders[idx],
+        })),
+      },
     },
     include: { items: { include: { kink: { select: kinkSelect } } } },
   });
@@ -69,6 +104,22 @@ export async function cancelActiveSessionsForUser(userId: string) {
     },
     data: { status: "CANCELLED" },
   });
+}
+
+const STALE_SESSION_THRESHOLD_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * A round nobody accepted or finished in 12h is almost certainly abandoned - clearing
+ * it out stops it cluttering "in progress" lists and blocking the pair from starting a
+ * fresh one (createSession rejects a new round while an old PENDING/ACTIVE one exists).
+ */
+export async function expireStaleSessions(): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_SESSION_THRESHOLD_MS);
+  const { count } = await prisma.gameSession.updateMany({
+    where: { status: { in: ["PENDING", "ACTIVE"] }, createdAt: { lt: cutoff } },
+    data: { status: "CANCELLED" },
+  });
+  return count;
 }
 
 export async function listPendingSessions(userId: string) {
@@ -120,19 +171,30 @@ export async function getSessionDetail(sessionId: string, userId: string) {
   const partnerId = session.initiatorId === userId ? session.partnerId : session.initiatorId;
   const partnerResponseCount = await prisma.response.count({ where: { sessionId, userId: partnerId } });
 
+  const isInitiator = session.initiatorId === userId;
+  // Sort by the order assigned once at creation, not a fresh shuffle - otherwise the deck
+  // would jumble (and the "resume where I left off" position would drift) on every reload.
+  const orderedItems = [...session.items].sort((a, b) => {
+    const orderA = (isInitiator ? a.initiatorOrder : a.partnerOrder) ?? 0;
+    const orderB = (isInitiator ? b.initiatorOrder : b.partnerOrder) ?? 0;
+    return orderA - orderB;
+  });
+
   return {
     id: session.id,
     status: session.status,
     itemCount: session.itemCount,
-    isInitiator: session.initiatorId === userId,
+    isInitiator,
     createdAt: session.createdAt,
     acceptedAt: session.acceptedAt,
     completedAt: session.completedAt,
-    items: shuffle(session.items).map((item) => ({
+    items: orderedItems.map((item) => ({
       kinkId: item.kinkId,
       name: item.kink.name,
       description: item.kink.description,
       hasRoleVariant: item.kink.hasRoleVariant,
+      roleA: item.kink.roleA ?? null,
+      roleB: item.kink.roleB ?? null,
       myAnswer: myResponseMap.get(item.kinkId)?.answer ?? null,
       myRole: myResponseMap.get(item.kinkId)?.role ?? null,
     })),
@@ -180,11 +242,16 @@ async function maybeCompleteSession(sessionId: string, itemCount: number) {
   const session = await prisma.gameSession.findUnique({ where: { id: sessionId } });
   if (!session || session.status === "COMPLETED") return;
 
-  const yesByKink = new Map<string, number>();
+  const yesResponsesByKink = new Map<string, (ResponseRole | null)[]>();
   for (const r of responses) {
-    if (r.answer) yesByKink.set(r.kinkId, (yesByKink.get(r.kinkId) ?? 0) + 1);
+    if (!r.answer) continue;
+    const roles = yesResponsesByKink.get(r.kinkId) ?? [];
+    roles.push(r.role);
+    yesResponsesByKink.set(r.kinkId, roles);
   }
-  const matchedKinkIds = [...yesByKink.entries()].filter(([, count]) => count >= 2).map(([kinkId]) => kinkId);
+  const matchedKinkIds = [...yesResponsesByKink.entries()]
+    .filter(([, roles]) => roles.length >= 2 && rolesAreCompatible(roles[0]!, roles[1]!))
+    .map(([kinkId]) => kinkId);
 
   await prisma.$transaction([
     prisma.gameSession.update({ where: { id: sessionId }, data: { status: "COMPLETED", completedAt: new Date() } }),
@@ -227,6 +294,8 @@ export async function getSessionMatches(sessionId: string, userId: string) {
       kinkId: m.kinkId,
       name: m.kink.name,
       description: m.kink.description,
+      roleA: m.kink.roleA ?? null,
+      roleB: m.kink.roleB ?? null,
       myRole: byUser?.get(userId) ?? null,
       partnerRole: byUser?.get(partnerId) ?? null,
     };

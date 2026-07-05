@@ -46,7 +46,7 @@ enum UITestHarness {
         }
     }
 
-    static func runHome(viewModel: HomeViewModel, path: Binding<[AppRoute]>) async {
+    static func runHome(viewModel: HomeViewModel, path: Binding<[AppRoute]>, initiatorId: String, partnerId: String) async {
         guard isEnabled else { return }
 
         if gotoHistory {
@@ -72,7 +72,13 @@ enum UITestHarness {
                 return
             }
             if !didStart, let count = autoStartCount, viewModel.incomingInvite == nil, viewModel.mySessionSummary == nil {
-                if let session = await viewModel.startSession(itemCount: count) {
+                if let session = await viewModel.startSession(
+                    itemCount: count,
+                    maxIntensity: .mild,
+                    exactIntensity: false,
+                    initiatorId: initiatorId,
+                    partnerId: partnerId
+                ) {
                     log("sessionCreated id=\(session.id) status=\(session.status.rawValue)")
                     didStart = true
                     await pauseForStep()

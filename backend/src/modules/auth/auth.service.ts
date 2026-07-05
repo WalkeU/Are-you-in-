@@ -94,15 +94,37 @@ export async function refreshTokens(refreshToken: string) {
   return issueTokenPair(record.userId);
 }
 
+/**
+ * There's no "log back in" flow in this app (registration is the only entry point),
+ * so logging out is already a point of no return for the account - this makes it the
+ * de facto account-deletion action. Wipes this user's own answers and permanently
+ * revokes their tokens, then anonymizes (rather than deletes) the User row itself,
+ * since GameSession/Match rows are shared with the partner and must keep pointing at
+ * a valid user for the partner's own history to keep working.
+ */
+async function wipeAccountData(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return;
+
+  await prisma.$transaction([
+    prisma.response.deleteMany({ where: { userId } }),
+    prisma.refreshToken.deleteMany({ where: { userId } }),
+    ...(user.partnerId
+      ? [prisma.user.update({ where: { id: user.partnerId }, data: { partnerId: null } })]
+      : []),
+    prisma.user.update({
+      where: { id: userId },
+      data: { name: "Törölt felhasználó", inviteCode: `deleted-${userId}`, partnerId: null },
+    }),
+  ]);
+}
+
 export async function logout(refreshToken: string) {
   try {
     const payload = verifyRefreshToken(refreshToken);
-    await prisma.refreshToken.updateMany({
-      where: { id: payload.jti, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
     // Don't leave the partner stuck waiting on someone who just walked away mid-round.
     await cancelActiveSessionsForUser(payload.sub);
+    await wipeAccountData(payload.sub);
   } catch {
     // Already invalid/expired - logout is idempotent either way.
   }

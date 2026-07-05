@@ -44,13 +44,20 @@ struct HomeView: View {
             await viewModel.load()
             viewModel.startPolling()
             #if DEBUG
-            await UITestHarness.runHome(viewModel: viewModel, path: $path)
+            await UITestHarness.runHome(viewModel: viewModel, path: $path, initiatorId: user.id, partnerId: partner.id)
             #endif
         }
         .onDisappear { viewModel.stopPolling() }
         .sheet(isPresented: $showingNewSession) {
-            NewSessionSheet(partnerName: partner.name) { count in
-                _ = await viewModel.startSession(itemCount: count)
+            NewSessionSheet(partnerName: partner.name) { count, maxIntensity, exactIntensity in
+                let session = await viewModel.startSession(
+                    itemCount: count,
+                    maxIntensity: maxIntensity,
+                    exactIntensity: exactIntensity,
+                    initiatorId: user.id,
+                    partnerId: partner.id
+                )
+                return session != nil
             }
         }
         .overlay {
@@ -71,10 +78,12 @@ struct HomeView: View {
             isPresented: $showingLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Kijelentkezés", role: .destructive) {
+            Button("Kijelentkezés és fiók törlése", role: .destructive) {
                 Task { await appState.logout() }
             }
             Button("Mégse", role: .cancel) {}
+        } message: {
+            Text("Nincs visszalépés: a kijelentkezés véglegesen törli a válaszaidat és a fiókodat, nem tudsz majd ugyanazzal a fiókkal visszajelentkezni. A partnered oldalán a közösen lejátszott körök és egyezések megmaradnak.")
         }
     }
 

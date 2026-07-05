@@ -104,10 +104,12 @@ struct PairingView: View {
             isPresented: $showingLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Kijelentkezés", role: .destructive) {
+            Button("Kijelentkezés és fiók törlése", role: .destructive) {
                 Task { await appState.logout() }
             }
             Button("Mégse", role: .cancel) {}
+        } message: {
+            Text("Nincs visszalépés: a kijelentkezés véglegesen törli a válaszaidat és a fiókodat, nem tudsz majd ugyanazzal a fiókkal visszajelentkezni.")
         }
     }
 

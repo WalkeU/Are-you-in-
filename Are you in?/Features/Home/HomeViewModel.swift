@@ -11,25 +11,40 @@ final class HomeViewModel {
 
     private let api = APIClient.shared
     private var pollTask: Task<Void, Never>?
+    /// Guards against the background poll racing a manual load (e.g. right after
+    /// starting a session) - whichever request happened to land second would
+    /// otherwise clobber the other's result, flashing a stale error or state.
+    private var isLoadInFlight = false
 
     func load(showsLoading: Bool = true) async {
+        guard !isLoadInFlight else { return }
+        isLoadInFlight = true
         if showsLoading {
             isLoading = true
         }
-        defer { if showsLoading { isLoading = false } }
+        defer {
+            isLoadInFlight = false
+            if showsLoading { isLoading = false }
+        }
         do {
-            async let pending = api.pendingSessions()
-            async let active = api.activeSessions()
-            let (pendingList, activeList) = try await (pending, active)
-
-            incomingInvite = pendingList.first
-            // My own view of a round I'm part of - either one I started (still pending
-            // partner's accept) or one that's already active.
-            mySessionSummary = activeList.first
+            try await fetchAndApply()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            // A cancelled request (e.g. this exact load got superseded/stopped) isn't a
+            // real failure - surfacing it as an error banner would just be noise.
+            if !Task.isCancelled { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func fetchAndApply() async throws {
+        async let pending = api.pendingSessions()
+        async let active = api.activeSessions()
+        let (pendingList, activeList) = try await (pending, active)
+
+        incomingInvite = pendingList.first
+        // My own view of a round I'm part of - either one I started (still pending
+        // partner's accept) or one that's already active.
+        mySessionSummary = activeList.first
     }
 
     /// Keeps the home screen in sync without a manual pull-to-refresh - most relevant
@@ -50,11 +65,40 @@ final class HomeViewModel {
         pollTask = nil
     }
 
-    func startSession(itemCount: Int) async -> SessionDetail? {
+    func startSession(
+        itemCount: Int,
+        maxIntensity: KinkIntensity,
+        exactIntensity: Bool,
+        initiatorId: String,
+        partnerId: String
+    ) async -> SessionDetail? {
         errorMessage = nil
+        isLoading = true
+        stopPolling()
+        defer {
+            isLoading = false
+            startPolling()
+        }
         do {
-            let session = try await api.createSession(itemCount: itemCount)
-            await load()
+            let session = try await api.createSession(
+                itemCount: itemCount,
+                maxIntensity: maxIntensity,
+                exactIntensity: exactIntensity
+            )
+            // Build the "waiting" state straight from the create response instead of
+            // firing a second fetch afterward - a background poll response dispatched
+            // just before the round existed could otherwise land after that fetch and
+            // stomp the correct state back to nothing, which is what was leaving the
+            // start screen showing instead of the waiting card.
+            mySessionSummary = SessionSummary(
+                id: session.id,
+                initiatorId: initiatorId,
+                partnerId: partnerId,
+                itemCount: session.itemCount,
+                status: session.status,
+                createdAt: session.createdAt
+            )
+            errorMessage = nil
             return session
         } catch {
             errorMessage = error.localizedDescription

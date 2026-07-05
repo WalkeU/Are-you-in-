@@ -116,7 +116,7 @@ All endpoints are namespaced under `/api` and (except `/auth/register`, `/auth/r
 
 - `Kink` rows are seeded from `src/data/kinks.ts` by stable `key`, so the catalog can grow
   (new items, categories, i18n) without breaking existing `Response`/`Match` history.
-- `role` is a first-class enum (`GIVE`/`RECEIVE`/`BOTH`) attached to `Response`, ready for
+- `role` is a first-class enum (`ROLE_A`/`ROLE_B`/`BOTH`) attached to `Response`, ready for
   richer compatibility scoring later.
 - Refresh tokens are individually revocable (`RefreshToken` rows), which is what a future
   "log out other devices" or admin-revoke feature would build on.

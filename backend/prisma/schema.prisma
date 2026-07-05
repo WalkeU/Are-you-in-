@@ -16,8 +16,8 @@ enum SessionStatus {
 }
 
 enum ResponseRole {
-  GIVE
-  RECEIVE
+  ROLE_A
+  ROLE_B
   BOTH
 }
 
@@ -59,11 +59,17 @@ model Kink {
   description     String
   hasRoleVariant  Boolean  @default(false)
   order           Int      @default(0)
+  roleA           String?
+  roleB           String?
+  /// Difficulty/hardness tier: 1 = vanilla, 2 = harder, 3 = the really intense stuff.
+  intensity       Int      @default(1)
   createdAt       DateTime @default(now())
 
   sessionItems GameSessionItem[]
   responses    Response[]
   matches      Match[]
+
+  @@index([intensity])
 }
 
 model GameSession {
@@ -93,6 +99,11 @@ model GameSessionItem {
   session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   kinkId    String
   kink      Kink        @relation(fields: [kinkId], references: [id])
+
+  // Assigned once at session creation so each participant's deck order is stable
+  // across reloads (and independent of each other) instead of reshuffling on every fetch.
+  initiatorOrder Int?
+  partnerOrder   Int?
 
   @@unique([sessionId, kinkId])
   @@index([sessionId])

@@ -1,5 +1,11 @@
+# Explicit projektnév + konténernevek, hogy a Docker Desktop/`docker ps` alapján
+# egyértelműen megkülönböztethető legyen egy másik, esetleg szintén "backend"
+# nevű mappában futó, teljesen független projekttől ezen a gépen.
+name: areyouin
+
 services:
   db:
+    container_name: areyouin-db
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -17,6 +23,7 @@ services:
       - "5432:5432"
 
   api:
+    container_name: areyouin-api
     build:
       context: .
       dockerfile: Dockerfile
@@ -40,4 +47,9 @@ services:
       - "3000:3000"
 
 volumes:
+  # Pinned to its existing physical name (from before the project rename) so an
+  # existing prod DB volume keeps being reused instead of starting from a fresh one,
+  # and marked external so `docker compose down -v` can never delete it by accident.
   db-data:
+    name: backend_db-data
+    external: true

@@ -28,8 +28,16 @@ extension APIClient {
     }
 
     // Sessions
-    func createSession(itemCount: Int) async throws -> SessionDetail {
-        let response: SessionEnvelope<SessionDetail> = try await post("sessions", body: ["itemCount": itemCount])
+    func createSession(itemCount: Int, maxIntensity: KinkIntensity, exactIntensity: Bool) async throws -> SessionDetail {
+        struct Body: Encodable {
+            let itemCount: Int
+            let maxIntensity: Int
+            let exactIntensity: Bool
+        }
+        let response: SessionEnvelope<SessionDetail> = try await post(
+            "sessions",
+            body: Body(itemCount: itemCount, maxIntensity: maxIntensity.rawValue, exactIntensity: exactIntensity)
+        )
         return response.session
     }
 

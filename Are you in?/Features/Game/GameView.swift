@@ -64,6 +64,8 @@ struct GameView: View {
         .sheet(item: Bindable(viewModel).awaitingRoleFor) { item in
             RoleQuestionView(
                 itemName: item.name,
+                roleALabel: item.roleA ?? "A szerep",
+                roleBLabel: item.roleB ?? "B szerep",
                 onSelect: { role in
                     Task { await viewModel.answer(true, role: role) }
                 },

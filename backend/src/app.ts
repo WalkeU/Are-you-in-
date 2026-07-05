@@ -45,7 +45,18 @@ export function createApp() {
 
   // Dev-only dashboard for eyeballing users/sessions - never mounted in production.
   if (!env.isProduction) {
-    app.use("/debug", debugRouter);
+    app.use(
+      "/debug",
+      (_req, res, next) => {
+        // This page is only ever served over plain HTTP on the LAN. Helmet's HSTS and
+        // upgrade-insecure-requests headers would make the browser force it (and its
+        // 5s auto-refresh) onto https on this host/port, where nothing is listening.
+        res.removeHeader("Strict-Transport-Security");
+        res.removeHeader("Content-Security-Policy");
+        next();
+      },
+      debugRouter,
+    );
   }
 
   app.use("/api/auth", authRouter);

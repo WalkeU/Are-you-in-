@@ -2,8 +2,12 @@ import type { Request, Response } from "express";
 import * as sessionsService from "./sessions.service";
 
 export async function createSessionHandler(req: Request, res: Response) {
-  const { itemCount } = req.body as { itemCount: number };
-  const session = await sessionsService.createSession(req.userId!, itemCount);
+  const { itemCount, maxIntensity, exactIntensity } = req.body as {
+    itemCount: number;
+    maxIntensity: number;
+    exactIntensity: boolean;
+  };
+  const session = await sessionsService.createSession(req.userId!, itemCount, maxIntensity, exactIntensity);
   res.status(201).json({ session });
 }
 
